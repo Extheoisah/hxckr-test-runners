@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.13.0/.schema/devbox.schema.json",
+  "packages": ["nodejs", "yarn"],
+  "shell": {
+    "init_hook": ["echo 'Welcome to devbox!'"],
+    "scripts": {
+      "dev": ["yarn install && yarn dev"],
+      "build": ["yarn install && yarn build"],
+      "start": ["yarn start"],
+      "test": ["echo \"Error: no test specified\" && exit 1"]
+    }
+  }
+}
