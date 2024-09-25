@@ -26,31 +26,17 @@ export async function cloneRepository(
     await execAsync(`git checkout ${commitSha}`, { cwd: cloneDir });
 
     // Ensure .hxckr directory exists
-    await fs.ensureDir(path.join(cloneDir, ".hxckr"));
+    const hxckrDir = path.join(cloneDir, ".hxckr");
+    await fs.ensureDir(hxckrDir);
 
-    // Check if run.sh exists
-    const runShPath = path.join(cloneDir, ".hxckr", "run.sh");
-    if (!(await fs.pathExists(runShPath))) {
-      console.log("run.sh not found in the cloned repository");
+    // Check if run.sh exists and make it executable
+    const runShPath = path.join(hxckrDir, "run.sh");
+    if (await fs.pathExists(runShPath)) {
+      await execAsync(`chmod +x ${runShPath}`);
     } else {
-      // Check if run.sh is not already in the .hxckr directory
-      const sourceRunShPath = path.join(cloneDir, "run.sh");
-      if (
-        (await fs.pathExists(sourceRunShPath)) &&
-        sourceRunShPath !== runShPath
-      ) {
-        // Copy run.sh to .hxckr/run.sh if it exists and is not already there
-        await fs.copy(sourceRunShPath, runShPath);
-      }
+      console.log("run.sh not found in the .hxckr directory");
     }
-    // Check if your_program.sh exists
-    const yourProgramPath = path.join(cloneDir, "your_program.sh");
-    if (!(await fs.pathExists(yourProgramPath))) {
-      console.log("your_program.sh not found in the cloned repository");
-    } else {
-      // Make sure your_program.sh is executable
-      await execAsync(`chmod +x ${yourProgramPath}`);
-    }
+
     console.log("Repository setup completed successfully");
     return cloneDir;
   } catch (error: any) {

@@ -8,11 +8,12 @@ import {
   closeRabbitMQ,
 } from "./config/rabbitmq";
 import logger from "./utils/logger";
+import { config } from "./config/config";
 
 const app = express();
 app.use(express.json());
 
-const PORT = process.env.PORT || 3001;
+const PORT = config.port;
 
 async function startConsumer() {
   const channel = getChannel();

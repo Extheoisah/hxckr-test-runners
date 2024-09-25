@@ -6,15 +6,18 @@
   "author": "nully0x <olusegunsamson@live.com>",
   "license": "MIT",
   "scripts": {
+    "clean": "rm -rf dist",
+    "build": "yarn clean && tsc && yarn copy-nix-shells",
+    "copy-nix-shells": "copyfiles -u 2 src/supportedLanguageShell/*.nix dist/supportedLanguageShell",
     "start": "node dist/server.js",
-    "dev": "tsc-watch --onSuccess \"node ./dist/server.js\"",
-    "build": "npm run clean && tsc"
+    "dev": "yarn clean && yarn copy-nix-shells && tsc-watch --onSuccess \"node ./dist/server.js\""
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.5",
     "@types/express": "^4.17.21",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.5.4",
+    "copyfiles": "^2.4.1",
     "ts-node": "^10.9.2",
     "tsc-watch": "^6.2.0",
     "typescript": "^5.6.2"

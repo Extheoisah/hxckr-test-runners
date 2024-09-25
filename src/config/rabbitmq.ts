@@ -1,7 +1,13 @@
 import amqp from "amqplib";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 export const rabbitMQConfig = {
-  url: process.env.RABBITMQ_URL || "amqp://guest:guest@localhost:5672",
+  host: process.env.RABBITMQ_HOST,
+  port: process.env.RABBITMQ_PORT,
+  username: process.env.RABBITMQ_USERNAME,
+  password: process.env.RABBITMQ_PASSWORD,
   queueTestRunner: "test_runner_queue",
   queueTestResults: "test_results_queue",
 };
@@ -11,7 +17,16 @@ let channel: amqp.Channel | null = null;
 
 export async function setupRabbitMQ() {
   try {
-    connection = await amqp.connect(rabbitMQConfig.url);
+    if (
+      !rabbitMQConfig.host ||
+      !rabbitMQConfig.port ||
+      !rabbitMQConfig.username ||
+      !rabbitMQConfig.password
+    ) {
+      throw new Error("RabbitMQ configuration is incomplete");
+    }
+    const url = `amqp://${rabbitMQConfig.username}:${rabbitMQConfig.password}@${rabbitMQConfig.host}:${rabbitMQConfig.port}`;
+    connection = await amqp.connect(url);
     channel = await connection.createChannel();
     await channel.assertQueue(rabbitMQConfig.queueTestRunner, {
       durable: true,

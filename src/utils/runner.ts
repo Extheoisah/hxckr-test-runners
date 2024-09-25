@@ -22,7 +22,11 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
     ];
 
     console.log("Starting test execution");
-    const testResult = await runTests(repoDir, TEST_STAGES);
+    const testResult = await runTests(
+      repoDir,
+      TEST_STAGES,
+      languageConfig.language,
+    );
     console.log("Test execution completed");
     await reportResults(commitSha, testResult);
   } catch (error: any) {
