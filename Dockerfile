@@ -1,8 +1,4 @@
-# Stage 1: Build environment
-FROM node:16-alpine AS builder
-
-# Install build dependencies and Git
-RUN apk add --no-cache git
+FROM node:20-alpine AS build
 
 # Set working directory
 WORKDIR /app
@@ -11,7 +7,7 @@ WORKDIR /app
 COPY package.json yarn.lock ./
 
 # Install dependencies
-RUN yarn install --frozen-lockfile
+RUN yarn install --frozen-lockfile --production
 
 # Copy the rest of the application code
 COPY . .
@@ -19,22 +15,32 @@ COPY . .
 # Build the application
 RUN yarn build
 
-# Stage 2: Create final image
-FROM gcr.io/distroless/nodejs:16
+# Start a new stage for the runtime image
+FROM alpine:3.14
 
-# Copy Git and its dependencies from the builder stage
-COPY --from=builder /usr/bin/git /usr/bin/git
-COPY --from=builder /lib/libz.so.1 /lib/libz.so.1
-COPY --from=builder /usr/lib/libpcre2-8.so.0 /usr/lib/libpcre2-8.so.0
-COPY --from=builder /lib/ld-musl-x86_64.so.1 /lib/ld-musl-x86_64.so.1
+# Install necessary packages and Nix
+RUN apk add --no-cache curl xz bash git && \
+    addgroup -S nixbld && \
+    for i in $(seq 1 10); do adduser -S -D -h /var/empty -g "Nix build user $i" -G nixbld nixbld$i; done && \
+    mkdir -m 0755 /nix && chown root /nix && \
+    mkdir -m 0755 /etc/nix && \
+    echo 'sandbox = false' > /etc/nix/nix.conf && \
+    curl -L https://nixos.org/nix/install | NIX_INSTALLER_NO_MODIFY_PROFILE=1 sh && \
+    . /root/.nix-profile/etc/profile.d/nix.sh && \
+    echo '. /root/.nix-profile/etc/profile.d/nix.sh' >> /root/.bashrc && \
+    /root/.nix-profile/bin/nix-env -iA nixpkgs.nodejs && \
+    /root/.nix-profile/bin/nix-collect-garbage -d
 
-# Set working directory
-WORKDIR /app
+# Set up environment for Nix
+ENV PATH="/root/.nix-profile/bin:${PATH}" \
+    NIX_PATH="/nix/var/nix/profiles/per-user/root/channels"
 
-# Copy application from builder stage
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
+# Copy built artifacts and node_modules from the build stage
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/node_modules ./node_modules
 
+# Expose the port the app runs on
 EXPOSE 3001
 
-CMD ["dist/server.js"]
+# Command to run the application
+CMD ["/bin/bash", "-c", "source /root/.nix-profile/etc/profile.d/nix.sh && node dist/server.js"]
