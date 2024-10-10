@@ -1,8 +1,10 @@
-import { getLanguageConfig } from "../config/config";
-import { TestRunRequest, TestStage } from "../models/types";
-import { cleanupRepository, cloneRepository } from "./gitUtils";
+import { detectLanguage, getLanguageConfig } from "../config/config";
+import { TestRunRequest, TestResult } from "../models/types";
+import { cloneRepository, cleanupRepository } from "./gitUtils";
 import { reportResults } from "./resultReporter";
-import { runTests } from "./testExecutor";
+import { buildDockerImage, runInDocker } from "./dockerUtils";
+import fs from "fs/promises";
+import path from "path";
 
 export async function runTestProcess(request: TestRunRequest): Promise<void> {
   const { repoUrl, branch, commitSha } = request;
@@ -11,23 +13,31 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
   try {
     repoDir = await cloneRepository(repoUrl, branch, commitSha);
     console.log(`Repository cloned to ${repoDir}`);
-    const languageConfig = getLanguageConfig(repoDir);
 
-    const TEST_STAGES: TestStage[] = [
-      ...languageConfig.setupCommands.map((command) => ({
-        name: "Setup",
-        command,
-      })),
-      { name: "Run Program", command: languageConfig.runCommand },
-    ];
+    const language = detectLanguage(repoDir);
+    console.log(`Detected language: ${language}`);
+    const languageConfig = getLanguageConfig(language);
+    const imageName = `test-image-${commitSha}`;
 
+    // Log content of .hxckr/run.sh
+    const runShPath = path.join(repoDir, ".hxckr", "run.sh");
+    const runShContent = await fs.readFile(runShPath, "utf-8");
+    console.log(".hxckr/run.sh content:", runShContent);
+
+    // Build Docker image
+    await buildDockerImage(repoDir, imageName, languageConfig.dockerfilePath);
+
+    // Run the tests
     console.log("Starting test execution");
-    const testResult = await runTests(
-      repoDir,
-      TEST_STAGES,
-      languageConfig.language,
-    );
+    const testOutput = await runInDocker(imageName, languageConfig.runCommand);
     console.log("Test execution completed");
+    console.log("Test output:", testOutput);
+
+    const testResult: TestResult = {
+      success: !testOutput.toLowerCase().includes("error"),
+      output: testOutput,
+    };
+
     await reportResults(commitSha, testResult);
   } catch (error: any) {
     console.error("Error during test process:", error);
