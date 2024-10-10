@@ -2,13 +2,14 @@ import { detectLanguage, getLanguageConfig } from "../config/config";
 import { TestRunRequest, TestResult } from "../models/types";
 import { cloneRepository, cleanupRepository } from "./gitUtils";
 import { reportResults } from "./resultReporter";
-import { buildDockerImage, runInDocker } from "./dockerUtils";
+import { buildDockerImage, runInDocker, cleanupDocker } from "./dockerUtils";
 import fs from "fs/promises";
 import path from "path";
 
 export async function runTestProcess(request: TestRunRequest): Promise<void> {
   const { repoUrl, branch, commitSha } = request;
   let repoDir: string | null = null;
+  let imageName: string | null = null;
 
   try {
     repoDir = await cloneRepository(repoUrl, branch, commitSha);
@@ -17,7 +18,7 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
     const language = detectLanguage(repoDir);
     console.log(`Detected language: ${language}`);
     const languageConfig = getLanguageConfig(language);
-    const imageName = `test-image-${commitSha}`;
+    imageName = `test-image-${commitSha}`;
 
     // Log content of .hxckr/run.sh
     const runShPath = path.join(repoDir, ".hxckr", "run.sh");
@@ -50,6 +51,10 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
     if (repoDir) {
       await cleanupRepository(repoDir);
       console.log("Repository cleaned up");
+    }
+    if (imageName) {
+      await cleanupDocker(imageName);
+      console.log("Docker resources cleaned up");
     }
   }
 }
