@@ -6,6 +6,7 @@ export interface TestRunRequest {
 }
 
 export interface TestResult {
+  event_type: string;
   success: boolean;
   output: string;
   errorMessage?: string;

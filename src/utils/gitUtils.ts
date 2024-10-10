@@ -2,6 +2,7 @@ import { exec } from "child_process";
 import fs from "fs-extra";
 import path from "path";
 import util from "util";
+import logger from "./logger";
 
 const execAsync = util.promisify(exec);
 
@@ -14,15 +15,13 @@ export async function cloneRepository(
   const cloneDir = path.join(
     __dirname,
     "..",
-    "temp",
+    "tmp",
     `${repoName}-${commitSha}`,
   );
 
   try {
     await fs.ensureDir(cloneDir);
-    console.log(`Cloning repository to ${cloneDir}`);
     await execAsync(`git clone --branch ${branch} ${repoUrl} ${cloneDir}`);
-    console.log(`Checking out commit ${commitSha}`);
     await execAsync(`git checkout ${commitSha}`, { cwd: cloneDir });
 
     // Ensure .hxckr directory exists
@@ -34,13 +33,13 @@ export async function cloneRepository(
     if (await fs.pathExists(runShPath)) {
       await execAsync(`chmod +x ${runShPath}`);
     } else {
-      console.log("run.sh not found in the .hxckr directory");
+      logger.warn("run.sh not found in repository");
     }
 
-    console.log("Repository setup completed successfully");
+    logger.info("Repository cloned", { cloneDir, commitSha });
     return cloneDir;
   } catch (error: any) {
-    console.error(`Error setting up repository: ${error.message}`);
+    logger.error("Error cloning repository", { error });
     throw error;
   }
 }

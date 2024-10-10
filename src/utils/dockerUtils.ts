@@ -1,5 +1,6 @@
 import { exec } from "child_process";
 import util from "util";
+import logger from "./logger";
 
 const execAsync = util.promisify(exec);
 
@@ -7,14 +8,13 @@ export async function buildDockerImage(
   repoDir: string,
   imageName: string,
   dockerfilePath: string,
-): Promise<void> {
+): Promise<string> {
   try {
     const { stdout, stderr } = await execAsync(
       `docker build -t ${imageName} -f ${dockerfilePath} ${repoDir}`,
     );
-    console.log("Docker build output:", stdout + stderr);
+    return stdout + stderr;
   } catch (error: any) {
-    console.error("Docker build error:", error);
     throw new Error(`Error building Docker image: ${error.message}`);
   }
 }
@@ -41,18 +41,18 @@ export async function runInDocker(
 export async function removeContainer(containerName: string): Promise<void> {
   try {
     await execAsync(`docker rm -f ${containerName}`);
-    console.log(`Container ${containerName} removed successfully`);
+    logger.info(`Container ${containerName} removed successfully`);
   } catch (error: any) {
-    console.error(`Error removing container ${containerName}:`, error.message);
+    logger.error(`Error removing container ${containerName}:`, error.message);
   }
 }
 
 export async function removeImage(imageName: string): Promise<void> {
   try {
     await execAsync(`docker rmi ${imageName}`);
-    console.log(`Image ${imageName} removed successfully`);
+    logger.info(`Image ${imageName} removed successfully`);
   } catch (error: any) {
-    console.error(`Error removing image ${imageName}:`, error.message);
+    logger.error(`Error removing image ${imageName}:`, error.message);
   }
 }
 
