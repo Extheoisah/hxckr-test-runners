@@ -15,7 +15,15 @@ export const LANGUAGE_CONFIGS: Record<string, LanguageConfig> = {
     language: "typescript",
     dockerfilePath: path.join(
       __dirname,
-      "../../baseImages/typescript/Dockerfile",
+      "../../supportedLangaugeDockerfiles/typescript/Dockerfile",
+    ),
+    runCommand: "/app/.hxckr/run.sh",
+  },
+  rust: {
+    language: "rust",
+    dockerfilePath: path.join(
+      __dirname,
+      "../../supportedLangaugeDockerfiles/rust/Dockerfile",
     ),
     runCommand: "/app/.hxckr/run.sh",
   },
@@ -25,6 +33,9 @@ export const LANGUAGE_CONFIGS: Record<string, LanguageConfig> = {
 export function detectLanguage(repoDir: string): string {
   if (fs.existsSync(path.join(repoDir, "package.json"))) {
     return "typescript";
+  }
+  if (fs.existsSync(path.join(repoDir, "Cargo.toml"))) {
+    return "rust";
   }
   throw new Error("Unsupported language");
 

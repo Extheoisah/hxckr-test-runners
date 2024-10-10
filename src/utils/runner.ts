@@ -35,7 +35,9 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
     console.log("Test output:", testOutput);
 
     const testResult: TestResult = {
-      success: !testOutput.toLowerCase().includes("error"),
+      success:
+        !testOutput.toLowerCase().includes("error") &&
+        !testOutput.toLowerCase().includes("failed"),
       output: testOutput,
     };
 
