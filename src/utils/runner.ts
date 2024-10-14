@@ -21,7 +21,7 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
     const languageConfig = getLanguageConfig(language);
     imageName = `test-image-${commitSha}`;
 
-    // Log content of .hxckr/run.sh, not neccessary just for debugging
+    // Log content of .hxckr/run.sh, not necessary just for debugging
     // const runShPath = path.join(repoDir, ".hxckr", "run.sh");
     // const runShContent = await fs.readFile(runShPath, "utf-8");
 

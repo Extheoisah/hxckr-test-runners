@@ -1,1 +1,1 @@
-FROM ts-base:latest
+FROM oven/bun:latest

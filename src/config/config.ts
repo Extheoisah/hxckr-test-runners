@@ -15,7 +15,7 @@ export const LANGUAGE_CONFIGS: Record<string, LanguageConfig> = {
     language: "typescript",
     dockerfilePath: path.join(
       __dirname,
-      "../../supportedLangaugeDockerfiles/typescript/Dockerfile",
+      "../../supportedLanguageDockerfiles/typescript/Dockerfile",
     ),
     runCommand: "/app/.hxckr/run.sh",
   },
@@ -23,7 +23,7 @@ export const LANGUAGE_CONFIGS: Record<string, LanguageConfig> = {
     language: "rust",
     dockerfilePath: path.join(
       __dirname,
-      "../../supportedLangaugeDockerfiles/rust/Dockerfile",
+      "../../supportedLanguageDockerfiles/rust/Dockerfile",
     ),
     runCommand: "/app/.hxckr/run.sh",
   },
