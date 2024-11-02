@@ -7,10 +7,10 @@ export async function reportResults(
   result: TestResult,
 ): Promise<void> {
   try {
-    logger.info("Reporting test results:", { result, commitSha });
+    logger.info("Reporting test results:", { result });
 
     const channel = getChannel();
-    const message = JSON.stringify({ commitSha, result });
+    const message = JSON.stringify({ result });
 
     channel.sendToQueue(rabbitMQConfig.queueTestResults, Buffer.from(message));
     logger.info("Test results reported and pushed to RabbitMQ", { commitSha });
