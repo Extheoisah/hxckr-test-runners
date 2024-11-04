@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
+import { TestRepoConfig } from "../models/types";
 
 dotenv.config();
 
@@ -53,4 +54,11 @@ export function getLanguageConfig(language: string): LanguageConfig {
 export const config = {
   port: process.env.PORT || 3001,
   baseUrl: process.env.BASE_URL || "http://192.168.49.2:30025/api",
+};
+
+export const TEST_REPO_CONFIG: TestRepoConfig = {
+  repoUrl:
+    process.env.TEST_REPO_URL || "https://github.com/your-org/test-repo.git",
+  branch: process.env.TEST_REPO_BRANCH || "main",
+  testsPath: process.env.TEST_REPO_PATH || "tests",
 };

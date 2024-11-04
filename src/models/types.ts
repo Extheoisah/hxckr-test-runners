@@ -33,3 +33,9 @@ export interface ProgressResponse {
   updated_at: string;
   total_stages: number;
 }
+
+export interface TestRepoConfig {
+  repoUrl: string;
+  branch: string;
+  testsPath: string;
+}
