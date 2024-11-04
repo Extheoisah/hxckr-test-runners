@@ -30,8 +30,12 @@ export async function runInDocker(
     );
     return stdout + stderr;
   } catch (error: any) {
-    console.error("Docker run error:", error);
-    return `Error running Docker command: ${error.message}\n${error.stdout}\n${error.stderr}`;
+    // For test failures, we want to capture the output rather than treat it as an error
+    if (error.stdout || error.stderr) {
+      return error.stdout + error.stderr;
+    }
+    // For actual Docker errors, return an error message
+    return `Docker execution error: ${error.message}`;
   } finally {
     // Ensure the container is removed even if there's an error
     await removeContainer(containerName).catch(console.error);

@@ -9,7 +9,7 @@ const execAsync = util.promisify(exec);
 export async function cloneRepository(
   repoUrl: string,
   branch: string,
-  commitSha: string,
+  commitSha: string | null = null,
 ): Promise<string> {
   const repoName = repoUrl.split("/").pop()?.replace(".git", "") || "repo";
   const cloneDir = path.join(

@@ -12,20 +12,25 @@ import path from "path";
 import { ProgressResponse } from "../models/types";
 
 export async function runTestProcess(request: TestRunRequest): Promise<void> {
-  const { repoUrl, branch, commitSha, challengeId } = request;
+  const { repoUrl, branch, commitSha } = request;
+
   let repoDir: string | null = null;
   let imageName: string | null = null;
 
   try {
     // Fetch user's progress
-    const progressArray: ProgressResponse[] = await fetchUserProgress(repoUrl);
-    if (progressArray.length === 0) {
+    const progressData: ProgressResponse[] = await fetchUserProgress(repoUrl);
+    if (progressData.length === 0) {
       throw new Error("No progress data found for the repository.");
     }
-    const progress = progressArray[0];
+    const progress = progressData[0];
     console.log("Progress", progress);
     logger.info("Retrieved user progress", { progress, commitSha });
 
+    const challengeId = progress.challenge_id;
+    if (!challengeId) {
+      throw new Error("Challenge ID not found in progress data.");
+    }
     // Check if the status is "not_started"
     if (progress.status === "not_started") {
       const testResult: TestResult = {
@@ -55,13 +60,25 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
       progress.progress_details.current_step,
     );
 
-    // Create test directory and write test file
-    const testDir = path.join(repoDir, ".hxckr", "tests");
-    await fs.mkdir(testDir, { recursive: true });
+    const appDir = path.join(repoDir, "app");
+    await fs.mkdir(appDir, { recursive: true });
 
-    const testFileName = `current${getTestExtension(language)}`;
-    await fs.writeFile(path.join(testDir, testFileName), testContent);
+    const testFileName = `stage${progress.progress_details.current_step}${getTestExtension(language)}`;
+    await fs.writeFile(path.join(appDir, testFileName), testContent);
     logger.info("Test file written", { testFileName });
+
+    // Create run.sh with modified commands
+    const runScript = `#!/bin/bash
+
+    set -e  # Exit on any error
+
+    # Run the tests only (they will execute the code as part of the tests)
+    bun test ./app/stage${progress.progress_details.current_step}${getTestExtension(language)}
+    `;
+
+    const runScriptPath = path.join(repoDir, ".hxckr", "run.sh");
+    await fs.writeFile(runScriptPath, runScript);
+    await fs.chmod(runScriptPath, 0o755); // Make executable
 
     // Build Docker image
     await buildDockerImage(repoDir, imageName, languageConfig.dockerfilePath);
@@ -76,26 +93,30 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
     logger.info("Test execution completed", { commitSha });
     logger.info("Test output:", { testOutput });
 
+    // Clean and parse the test output
+    const cleanedOutput = cleanTestOutput(testOutput);
+    const success = isTestSuccessful(testOutput);
+
     const testResult: TestResult = {
       event_type: EVENT_TYPE,
       repoUrl,
       commitSha,
-      success:
-        !testOutput.toLowerCase().includes("error") &&
-        !testOutput.toLowerCase().includes("failed"),
-      output: testOutput,
+      success,
+      output: cleanedOutput,
     };
 
     await reportResults(commitSha, testResult);
   } catch (error: any) {
     logger.error("Error during test process", { error, commitSha });
+    const errorMessage =
+      error.stderr || error.message || "Unknown error occurred";
     await reportResults(commitSha, {
       event_type: EVENT_TYPE,
       repoUrl,
       commitSha,
       success: false,
-      output: "",
-      errorMessage: `Unhandled error: ${error.message}`,
+      output: error.stdout || "",
+      errorMessage: `Test execution failed: ${errorMessage}`,
     });
   } finally {
     if (repoDir) {
@@ -115,4 +136,22 @@ function getTestExtension(language: string): string {
     // I will add more languages as needed
   };
   return extensions[language] || ".test";
+}
+
+function isTestSuccessful(output: string): boolean {
+  // Check if all tests passed
+  const failMatch = output.match(/(\d+)\s+fail/);
+  const failCount = failMatch ? parseInt(failMatch[1]) : 0;
+  return failCount === 0;
+}
+
+function cleanTestOutput(output: string): string {
+  // Remove the duplicate output and clean up the format
+  const testRunMatch = output.match(
+    /app\/stage\d+\.test\.ts:[\s\S]+?Ran \d+ tests across \d+ files\./,
+  );
+  if (testRunMatch) {
+    return testRunMatch[0].trim();
+  }
+  return output.trim();
 }
