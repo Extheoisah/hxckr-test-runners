@@ -1,5 +1,4 @@
-import fs from "fs/promises";
-import path from "path";
+import { TestRepoManager } from "./testRepoManager";
 import logger from "./logger";
 
 export async function loadTestFile(
@@ -17,23 +16,20 @@ export async function loadTestFile(
     throw new Error(`Unsupported language: ${language}`);
   }
 
-  const testPath = path.join(
-    __dirname,
-    "..",
-    "tests",
-    challengeId,
-    language,
-    `stage${stage}${extension}`,
-  );
-
   try {
-    const testContent = await fs.readFile(testPath, "utf-8");
+    const testRepo = TestRepoManager.getInstance();
+    const testContent = await testRepo.getTestContent(
+      challengeId,
+      language,
+      stage,
+    );
+
     logger.info("Test file loaded successfully", {
       challengeId,
       language,
       stage,
-      testPath,
     });
+
     return testContent;
   } catch (error) {
     logger.error("Failed to load test file", {
@@ -41,7 +37,6 @@ export async function loadTestFile(
       challengeId,
       language,
       stage,
-      testPath,
     });
     throw new Error(`Test file not found for stage ${stage}`);
   }
