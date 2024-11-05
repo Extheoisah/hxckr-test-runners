@@ -31,7 +31,6 @@ export interface ProgressResponse {
   progress_details: ProgressDetails;
   created_at: string;
   updated_at: string;
-  total_stages: number;
 }
 
 export interface TestRepoConfig {
