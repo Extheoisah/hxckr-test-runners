@@ -10,6 +10,7 @@ import logger from "./logger";
 import fs from "fs/promises";
 import path from "path";
 import { ProgressResponse } from "../models/types";
+import { TestRepoManager } from "./testRepoManager";
 
 export async function runTestProcess(request: TestRunRequest): Promise<void> {
   const { repoUrl, branch, commitSha } = request;
@@ -19,11 +20,11 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
 
   try {
     // Fetch user's progress
-    const progressData: ProgressResponse[] = await fetchUserProgress(repoUrl);
-    if (progressData.length === 0) {
+    const progressData: ProgressResponse = await fetchUserProgress(repoUrl);
+    if (!progressData) {
       throw new Error("No progress data found for the repository.");
     }
-    const progress = progressData[0];
+    const progress = progressData;
     logger.info("Retrieved user progress", { progress, commitSha });
 
     const challengeId = progress.challenge_id;
@@ -62,7 +63,7 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
     const appDir = path.join(repoDir, "app");
     await fs.mkdir(appDir, { recursive: true });
 
-    const testFileName = `stage${progress.progress_details.current_step}${getTestExtension(language)}`;
+    const testFileName = `stage${progress.progress_details.current_step}${TestRepoManager.getTestExtension(language)}`;
     await fs.writeFile(path.join(appDir, testFileName), testContent);
     logger.info("Test file written", { testFileName });
 
@@ -72,7 +73,7 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
     set -e  # Exit on any error
 
     # Run the tests only (they will execute the code as part of the tests)
-    bun test ./app/stage${progress.progress_details.current_step}${getTestExtension(language)}
+    bun test ./app/stage${progress.progress_details.current_step}${TestRepoManager.getTestExtension(language)}
     `;
 
     const runScriptPath = path.join(repoDir, ".hxckr", "run.sh");
@@ -127,14 +128,6 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
       logger.info("Docker resources cleaned up");
     }
   }
-}
-
-function getTestExtension(language: string): string {
-  const extensions: Record<string, string> = {
-    typescript: ".test.ts",
-    // I will add more languages as needed
-  };
-  return extensions[language] || ".test";
 }
 
 function isTestSuccessful(output: string): boolean {

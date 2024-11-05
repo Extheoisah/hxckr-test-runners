@@ -58,6 +58,15 @@ export class TestRepoManager {
     }
   }
 
+  public static getTestExtension(language: string): string {
+    const extensions: Record<string, string> = {
+      typescript: ".test.ts",
+      rust: ".test.rs",
+      // Add more languages as needed
+    };
+    return extensions[language] || ".test";
+  }
+
   private async ensureRepoUpdated(): Promise<string> {
     const now = Date.now();
 
@@ -89,7 +98,7 @@ export class TestRepoManager {
       TEST_REPO_CONFIG.testsPath,
       challengeId,
       language,
-      `stage${stage}.test.ts`,
+      `stage${stage}${TestRepoManager.getTestExtension(language)}`,
     );
 
     try {
