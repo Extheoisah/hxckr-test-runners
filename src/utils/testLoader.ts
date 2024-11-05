@@ -6,16 +6,6 @@ export async function loadTestFile(
   language: string,
   stage: number,
 ): Promise<string> {
-  const testExtensions: Record<string, string> = {
-    typescript: ".test.ts",
-    // we will add more languages as needed
-  };
-
-  const extension = testExtensions[language];
-  if (!extension) {
-    throw new Error(`Unsupported language: ${language}`);
-  }
-
   try {
     const testRepo = TestRepoManager.getInstance();
     const testContent = await testRepo.getTestContent(
