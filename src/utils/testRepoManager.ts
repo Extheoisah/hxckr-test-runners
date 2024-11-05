@@ -11,8 +11,6 @@ const execAsync = util.promisify(exec);
 export class TestRepoManager {
   private static instance: TestRepoManager;
   private repoDir: string | null = null;
-  private lastUpdate: number = 0;
-  private readonly updateInterval = 5 * 60 * 1000; // 5 minutes
 
   private constructor() {
     // Initialize repoDir to a fixed location
@@ -50,7 +48,7 @@ export class TestRepoManager {
 
   private async updateRepo(): Promise<void> {
     try {
-      await execAsync(`cd ${this.repoDir} && git pull`);
+      await execAsync(`cd ${this.repoDir} && git pull --rebase`);
       logger.info("Test repository updated successfully");
     } catch (error) {
       logger.error("Error updating test repository", { error });
@@ -68,17 +66,9 @@ export class TestRepoManager {
   }
 
   private async ensureRepoUpdated(): Promise<string> {
-    const now = Date.now();
-
     try {
       // Initialize repo if it doesn't exist
       await this.initializeRepo();
-
-      // Update repo if needed
-      if (now - this.lastUpdate > this.updateInterval) {
-        await this.updateRepo();
-        this.lastUpdate = now;
-      }
 
       return this.repoDir!;
     } catch (error) {
@@ -120,7 +110,6 @@ export class TestRepoManager {
   public async forceUpdate(): Promise<void> {
     try {
       await this.updateRepo();
-      this.lastUpdate = Date.now();
     } catch (error) {
       logger.error("Error forcing update", { error });
       throw error;
