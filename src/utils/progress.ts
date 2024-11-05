@@ -5,9 +5,9 @@ import { ProgressResponse } from "../models/types";
 
 export async function fetchUserProgress(
   repoUrl: string,
-): Promise<ProgressResponse[]> {
+): Promise<ProgressResponse> {
   try {
-    const response = await axios.get<ProgressResponse[]>(
+    const response = await axios.get<ProgressResponse>(
       `${config.baseUrl}/progress`,
       {
         params: { repo_url: repoUrl },
