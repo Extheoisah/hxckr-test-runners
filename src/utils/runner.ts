@@ -24,7 +24,6 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
       throw new Error("No progress data found for the repository.");
     }
     const progress = progressData[0];
-    console.log("Progress", progress);
     logger.info("Retrieved user progress", { progress, commitSha });
 
     const challengeId = progress.challenge_id;
