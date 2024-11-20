@@ -1,4 +1,4 @@
-name: Deploy to DigitalOcean
+name: Deploy Runner to DigitalOcean
 
 on:
   push:
@@ -35,22 +35,22 @@ jobs:
       # Create necessary directories first
       - name: Create Remote Directories
         run: |
-          ssh ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }} "mkdir -p ~/node-app/dist"
+          ssh -i ~/.ssh/nodejs_do_key ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }} "mkdir -p ~/node-app/dist"
 
       # Then copy files
       - name: Copy Built Files to Droplet
         run: |
-          scp -r dist/* ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }}:~/node-app/dist/
-          scp package.json ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }}:~/node-app/
-          scp yarn.lock ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }}:~/node-app/
+          scp -i ~/.ssh/nodejs_do_key -r dist/* ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }}:~/node-app/dist/
+          scp -i ~/.ssh/nodejs_do_key package.json ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }}:~/node-app/
+          scp -i ~/.ssh/nodejs_do_key yarn.lock ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }}:~/node-app/
 
       - name: Set Up .env File
         run: |
-          ssh ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }} "echo '${{ secrets.STAGING_RUNNER_SECRET_FILE }}' > ~/node-app/.env"
+          ssh -i ~/.ssh/nodejs_do_key ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }} "echo '${{ secrets.STAGING_RUNNER_SECRET_FILE }}' > ~/node-app/.env"
 
       - name: Install Dependencies and Start App
         run: |
-          ssh ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }} << 'EOF'
+          ssh -i ~/.ssh/nodejs_do_key ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }} << 'EOF'
           cd ~/node-app
           yarn install --production
           ls dist  # Debug: Check if dist directory exists on server
