@@ -28,8 +28,8 @@ jobs:
 
       - name: Install Dependencies and Build
         run: |
-          yarn install
-          yarn build
+          npm install
+          npm run build
           ls dist  # Debug: Check if dist directory exists and its contents
 
       # Create necessary directories first
@@ -42,7 +42,7 @@ jobs:
         run: |
           scp -i ~/.ssh/nodejs_do_key -r dist/* ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }}:~/node-app/dist/
           scp -i ~/.ssh/nodejs_do_key package.json ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }}:~/node-app/
-          scp -i ~/.ssh/nodejs_do_key yarn.lock ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }}:~/node-app/
+          scp -i ~/.ssh/nodejs_do_key package-lock.json ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }}:~/node-app/
 
       - name: Set Up .env File
         run: |
@@ -52,7 +52,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/nodejs_do_key ${{ secrets.STAGING_DROPLET_USER }}@${{ secrets.STAGING_DROPLET_IP }} << 'EOF'
           cd ~/node-app
-          yarn install --production
+          npm install --production
           ls dist  # Debug: Check if dist directory exists on server
 
           if pm2 list | grep -q node-app; then
