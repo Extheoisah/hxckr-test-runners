@@ -13,7 +13,6 @@ export class TestRepoManager {
   private repoDir: string | null = null;
 
   private constructor() {
-    // Initialize repoDir to a fixed location
     this.repoDir = path.join(os.tmpdir(), "hxckr-test-repo");
   }
 
@@ -26,32 +25,23 @@ export class TestRepoManager {
 
   private async initializeRepo(): Promise<void> {
     try {
-      // Check if directory exists
-      const exists = await fs
-        .access(this.repoDir!)
+      await fs.mkdir(this.repoDir!, { recursive: true });
+      const isGitRepo = await fs
+        .access(path.join(this.repoDir!, ".git"))
         .then(() => true)
         .catch(() => false);
 
-      if (!exists) {
-        // First time: Clone the repository
-        await fs.mkdir(this.repoDir!, { recursive: true });
+      if (!isGitRepo) {
         await execAsync(
           `git clone -b ${TEST_REPO_CONFIG.branch} ${TEST_REPO_CONFIG.repoUrl} ${this.repoDir}`,
         );
         logger.info("Test repository cloned successfully");
+      } else {
+        await execAsync(`cd ${this.repoDir} && git pull`);
+        logger.info("Test repository updated successfully");
       }
     } catch (error) {
       logger.error("Error initializing test repository", { error });
-      throw error;
-    }
-  }
-
-  private async updateRepo(): Promise<void> {
-    try {
-      await execAsync(`cd ${this.repoDir} && git pull --rebase`);
-      logger.info("Test repository updated successfully");
-    } catch (error) {
-      logger.error("Error updating test repository", { error });
       throw error;
     }
   }
@@ -60,6 +50,7 @@ export class TestRepoManager {
     const extensions: Record<string, string> = {
       typescript: ".test.ts",
       rust: ".test.rs",
+      python: "_test.py",
       // Add more languages as needed
     };
     return extensions[language] || ".test";
@@ -67,9 +58,7 @@ export class TestRepoManager {
 
   private async ensureRepoUpdated(): Promise<string> {
     try {
-      // Initialize repo if it doesn't exist
       await this.initializeRepo();
-
       return this.repoDir!;
     } catch (error) {
       logger.error("Error ensuring repo is updated", { error });
@@ -92,7 +81,9 @@ export class TestRepoManager {
     );
 
     try {
-      return await fs.readFile(testPath, "utf-8");
+      const content = await fs.readFile(testPath, "utf-8");
+      logger.info("Test content retrieved successfully");
+      return content;
     } catch (error) {
       logger.error("Error reading test file", {
         testPath,
@@ -105,11 +96,10 @@ export class TestRepoManager {
     }
   }
 
-  // We don't need cleanup anymore since we're keeping the repo
-  // But we might want a method to force update
   public async forceUpdate(): Promise<void> {
     try {
-      await this.updateRepo();
+      await execAsync(`cd ${this.repoDir} && git pull`);
+      logger.info("Test repository force updated successfully");
     } catch (error) {
       logger.error("Error forcing update", { error });
       throw error;
