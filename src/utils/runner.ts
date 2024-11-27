@@ -72,6 +72,7 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
     set -e  # Exit on any error
 
     # Run the tests based on the language
+    if [ -f "requirements.txt" ]; then
         # For Python projects
         pytest ./app/stage${progress.progress_details.current_step}${TestRepoManager.getTestExtension(language)} -v
     else
