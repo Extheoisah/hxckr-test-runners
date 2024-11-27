@@ -21,6 +21,7 @@ jobs:
               tag: "ts-base",
               path: "baseImages/typescript",
             }
+          - { name: "python", tag: "py-base", path: "baseImages/python" }
 
     steps:
       - name: Checkout Code
