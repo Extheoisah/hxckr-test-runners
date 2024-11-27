@@ -28,6 +28,14 @@ export const LANGUAGE_CONFIGS: Record<string, LanguageConfig> = {
     ),
     runCommand: "/app/.hxckr/run.sh",
   },
+  python: {
+    language: "python",
+    dockerfilePath: path.join(
+      __dirname,
+      "../../supportedLanguageDockerfiles/python/Dockerfile",
+    ),
+    runCommand: "/app/.hxckr/run.sh",
+  },
   // Add other languages as needed
 };
 
@@ -37,6 +45,9 @@ export function detectLanguage(repoDir: string): string {
   }
   if (fs.existsSync(path.join(repoDir, "Cargo.toml"))) {
     return "rust";
+  }
+  if (fs.existsSync(path.join(repoDir, "requirements.txt"))) {
+    return "python";
   }
   throw new Error("Unsupported language");
 

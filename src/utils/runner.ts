@@ -69,11 +69,16 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
 
     // Create run.sh with modified commands
     const runScript = `#!/bin/bash
-
     set -e  # Exit on any error
 
-    # Run the tests only (they will execute the code as part of the tests)
-    bun test ./app/stage${progress.progress_details.current_step}${TestRepoManager.getTestExtension(language)}
+    # Run the tests based on the language
+    if [ -f "requirements.txt" ]; then
+        # For Python projects
+        pytest ./app/stage${progress.progress_details.current_step}${TestRepoManager.getTestExtension(language)} -v
+    else
+        # For TypeScript projects
+        bun test ./app/stage${progress.progress_details.current_step}${TestRepoManager.getTestExtension(language)}
+    fi
     `;
 
     const runScriptPath = path.join(repoDir, ".hxckr", "run.sh");
@@ -131,19 +136,34 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
 }
 
 function isTestSuccessful(output: string): boolean {
-  // Check if all tests passed
-  const failMatch = output.match(/(\d+)\s+fail/);
-  const failCount = failMatch ? parseInt(failMatch[1]) : 0;
-  return failCount === 0;
+  if (output.includes("pytest")) {
+    // For Python tests - check for failures and errors
+    const hasFailed =
+      output.includes(" FAILED ") ||
+      output.includes("= FAILURES =") ||
+      output.includes(" ERROR ") ||
+      output.includes("!!!!!!!!!!!!!!!!!!!! Interrupted:");
+    return !hasFailed;
+  } else {
+    // For TypeScript tests (unchanged)
+    const failMatch = output.match(/(\d+)\s+fail/);
+    const failCount = failMatch ? parseInt(failMatch[1]) : 0;
+    return failCount === 0;
+  }
 }
 
 function cleanTestOutput(output: string): string {
-  // Remove the duplicate output and clean up the format
-  const testRunMatch = output.match(
-    /app\/stage\d+\.test\.ts:[\s\S]+?Ran \d+ tests across \d+ files\./,
-  );
-  if (testRunMatch) {
-    return testRunMatch[0].trim();
+  if (output.includes("pytest")) {
+    // For Python tests, return the complete test output
+    return output.trim();
+  } else {
+    // Handle TypeScript test output (unchanged)
+    const testRunMatch = output.match(
+      /app\/stage\d+\.test\.ts:[\s\S]+?Ran \d+ tests across \d+ files\./,
+    );
+    if (testRunMatch) {
+      return testRunMatch[0].trim();
+    }
   }
   return output.trim();
 }
