@@ -60,21 +60,31 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
       progress.progress_details.current_step,
     );
 
-    const appDir = path.join(repoDir, "app");
-    await fs.mkdir(appDir, { recursive: true });
-
-    const testFileName = `stage${progress.progress_details.current_step}${TestRepoManager.getTestExtension(language)}`;
-    await fs.writeFile(path.join(appDir, testFileName), testContent);
-    logger.info("Test file written", { testFileName });
+    if (language === "rust") {
+      const testsDir = path.join(repoDir, "tests");
+      await fs.mkdir(testsDir, { recursive: true });
+      const testFileName = `stage${progress.progress_details.current_step}${TestRepoManager.getTestExtension(language)}`;
+      await fs.writeFile(path.join(testsDir, testFileName), testContent);
+    } else {
+      const appDir = path.join(repoDir, "app");
+      await fs.mkdir(appDir, { recursive: true });
+      const testFileName = `stage${progress.progress_details.current_step}${TestRepoManager.getTestExtension(language)}`;
+      await fs.writeFile(path.join(appDir, testFileName), testContent);
+    }
 
     // Create run.sh with modified commands
     const runScript = `#!/bin/bash
     set -e  # Exit on any error
 
-    # Run the tests based on the language
     if [ -f "requirements.txt" ]; then
         # For Python projects
         pytest ./app/stage${progress.progress_details.current_step}${TestRepoManager.getTestExtension(language)} -v
+    elif [ -f "Cargo.toml" ]; then
+        # For Rust projects
+        # Build first (quietly)
+        cargo build > /dev/null 2>&1
+        # Run tests and show only test output
+        cargo test --test stage${progress.progress_details.current_step}_test
     else
         # For TypeScript projects
         bun test ./app/stage${progress.progress_details.current_step}${TestRepoManager.getTestExtension(language)}
@@ -94,23 +104,28 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
       stage: progress.progress_details.current_step,
     });
 
-    const testOutput = await runInDocker(imageName, languageConfig.runCommand);
+    const testResult = await runInDocker(imageName, languageConfig.runCommand);
     logger.info("Test execution completed", { commitSha });
-    logger.info("Test output:", { testOutput });
+    logger.info("Test output:", {
+      stdout: testResult.stdout,
+      stderr: testResult.stderr,
+      exitCode: testResult.exitCode,
+    });
 
-    // Clean and parse the test output
-    const cleanedOutput = cleanTestOutput(testOutput);
-    const success = isTestSuccessful(testOutput);
+    // Success is now determined by exit code(using this to avoid having to parse stdout/stderr for success/failure)
+    const success = testResult.exitCode === 0;
+    const output = success
+      ? testResult.stdout
+      : `${testResult.stderr}\n${testResult.stdout}`;
 
-    const testResult: TestResult = {
+    const result: TestResult = {
       event_type: EVENT_TYPE,
       repoUrl,
       commitSha,
       success,
-      output: cleanedOutput,
+      output: output.trim(),
     };
-
-    await reportResults(commitSha, testResult);
+    await reportResults(commitSha, result);
   } catch (error: any) {
     logger.error("Error during test process", { error, commitSha });
     const errorMessage =
@@ -135,35 +150,52 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
   }
 }
 
-function isTestSuccessful(output: string): boolean {
-  if (output.includes("pytest")) {
-    // For Python tests - check for failures and errors
-    const hasFailed =
-      output.includes(" FAILED ") ||
-      output.includes("= FAILURES =") ||
-      output.includes(" ERROR ") ||
-      output.includes("!!!!!!!!!!!!!!!!!!!! Interrupted:");
-    return !hasFailed;
-  } else {
-    // For TypeScript tests (unchanged)
-    const failMatch = output.match(/(\d+)\s+fail/);
-    const failCount = failMatch ? parseInt(failMatch[1]) : 0;
-    return failCount === 0;
-  }
-}
+// function isTestSuccessful(output: string): boolean {
+//   if (output.includes("running")) {
+//     // For Rust tests
+//     return (
+//       !output.includes("test result: FAILED") &&
+//       !output.includes("panicked at") &&
+//       !output.includes("failures:")
+//     );
+//   } else if (output.includes("pytest")) {
+//     // For Python tests
+//     const hasFailed =
+//       output.includes(" FAILED ") ||
+//       output.includes("= FAILURES =") ||
+//       output.includes(" ERROR ") ||
+//       output.includes("!!!!!!!!!!!!!!!!!!!! Interrupted:");
+//     return !hasFailed;
+//   } else {
+//     // For TypeScript tests
+//     const failMatch = output.match(/(\d+)\s+fail/);
+//     const failCount = failMatch ? parseInt(failMatch[1]) : 0;
+//     return failCount === 0;
+//   }
+// }
 
-function cleanTestOutput(output: string): string {
-  if (output.includes("pytest")) {
-    // For Python tests, return the complete test output
-    return output.trim();
-  } else {
-    // Handle TypeScript test output (unchanged)
-    const testRunMatch = output.match(
-      /app\/stage\d+\.test\.ts:[\s\S]+?Ran \d+ tests across \d+ files\./,
-    );
-    if (testRunMatch) {
-      return testRunMatch[0].trim();
-    }
-  }
-  return output.trim();
-}
+// function cleanTestOutput(output: string): string {
+//   if (output.includes("running")) {
+//     // For Rust tests
+//     const lines = output.split("\n");
+//     const relevantLines = lines.filter(
+//       (line) =>
+//         line.includes("running") ||
+//         line.includes("test test_") ||
+//         (line.includes("test result:") && !line.includes("Running")),
+//     );
+//     return relevantLines.join("\n").trim();
+//   } else if (output.includes("pytest")) {
+//     // For Python tests
+//     return output.trim();
+//   } else {
+//     // For TypeScript tests
+//     const testRunMatch = output.match(
+//       /app\/stage\d+\.test\.ts:[\s\S]+?Ran \d+ tests across \d+ files\./,
+//     );
+//     if (testRunMatch) {
+//       return testRunMatch[0].trim();
+//     }
+//     return output.trim();
+//   }
+// }
