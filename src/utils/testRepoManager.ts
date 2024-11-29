@@ -49,7 +49,7 @@ export class TestRepoManager {
   public static getTestExtension(language: string): string {
     const extensions: Record<string, string> = {
       typescript: ".test.ts",
-      rust: ".test.rs",
+      rust: "_test.rs",
       python: "_test.py",
       // Add more languages as needed
     };

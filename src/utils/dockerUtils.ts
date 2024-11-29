@@ -22,20 +22,20 @@ export async function buildDockerImage(
 export async function runInDocker(
   imageName: string,
   command: string,
-): Promise<string> {
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   const containerName = `container-${Date.now()}-${Math.random().toString(36).substring(7)}`;
   try {
     const { stdout, stderr } = await execAsync(
       `docker run --name ${containerName} --rm ${imageName} ${command}`,
     );
-    return stdout + stderr;
+    return { stdout, stderr, exitCode: 0 };
   } catch (error: any) {
-    // For test failures, we want to capture the output rather than treat it as an error
-    if (error.stdout || error.stderr) {
-      return error.stdout + error.stderr;
-    }
-    // For actual Docker errors, return an error message
-    return `Docker execution error: ${error.message}`;
+    // For test or compilation failures, return the output and error code
+    return {
+      stdout: error.stdout || "",
+      stderr: error.stderr || "",
+      exitCode: error.code || 1,
+    };
   } finally {
     // Ensure the container is removed even if there's an error
     await removeContainer(containerName).catch(console.error);
