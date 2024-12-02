@@ -9,11 +9,15 @@ import {
 } from "./config/rabbitmq";
 import logger from "./utils/logger";
 import { config } from "./config/config";
+import { establishSSEConnection } from "./controllers/sseController";
 
 const app = express();
 app.use(express.json());
 
 const PORT = config.port;
+
+// SSE endpoint
+app.get("/logs/:commitSha", establishSSEConnection);
 
 async function startConsumer() {
   const channel = getChannel();
