@@ -11,6 +11,7 @@ import fs from "fs/promises";
 import path from "path";
 import { ProgressResponse } from "../models/types";
 import { TestRepoManager } from "./testRepoManager";
+import SSELogger from "./sseLogger";
 
 export async function runTestProcess(request: TestRunRequest): Promise<void> {
   const { repoUrl, branch, commitSha } = request;
@@ -104,6 +105,8 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
       stage: progress.progress_details.current_step,
     });
 
+    SSELogger.log(commitSha, "Starting test process...");
+
     const testResult = await runInDocker(imageName, languageConfig.runCommand);
     logger.info("Test execution completed", { commitSha });
     logger.info("Test output:", {
@@ -111,6 +114,17 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
       stderr: testResult.stderr,
       exitCode: testResult.exitCode,
     });
+    if (testResult.stdout) {
+      SSELogger.log(commitSha, `Test output:\n${testResult.stdout}`);
+    }
+    if (testResult.stderr) {
+      SSELogger.log(commitSha, `Test errors:\n${testResult.stderr}`);
+    }
+
+    SSELogger.log(
+      commitSha,
+      `Test result: ${testResult.exitCode === 0 ? "Success" : "Failed"}`,
+    );
 
     // Success is now determined by exit code(using this to avoid having to parse stdout/stderr for success/failure)
     const success = testResult.exitCode === 0;
@@ -128,6 +142,7 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
     await reportResults(commitSha, result);
   } catch (error: any) {
     logger.error("Error during test process", { error, commitSha });
+    SSELogger.log(commitSha, "Test process failed: " + error.message);
     const errorMessage =
       error.stderr || error.message || "Unknown error occurred";
     await reportResults(commitSha, {
