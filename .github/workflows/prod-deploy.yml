@@ -1,0 +1,63 @@
+name: Deploy Runner to DigitalOcean Production
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    name: Build and Deploy Node.js App
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_PRIVATE_KEY }}" > ~/.ssh/nodejs_do_key
+          chmod 600 ~/.ssh/nodejs_do_key
+          ssh-keyscan -H ${{ secrets.PROD_DROPLET_IP }} >> ~/.ssh/known_hosts
+
+      - name: Install Dependencies and Build
+        run: |
+          npm install
+          npm run build
+          ls dist  # Debug: Check if dist directory exists and its contents
+
+      - name: Create Remote Directories
+        run: |
+          ssh -i ~/.ssh/nodejs_do_key ${{ secrets.PROD_DROPLET_USER }}@${{ secrets.PROD_DROPLET_IP }} "mkdir -p ~/node-app/dist"
+
+      - name: Copy Built Files to Droplet
+        run: |
+          scp -i ~/.ssh/nodejs_do_key -r dist/* ${{ secrets.PROD_DROPLET_USER }}@${{ secrets.PROD_DROPLET_IP }}:~/node-app/dist/
+          scp -i ~/.ssh/nodejs_do_key package.json ${{ secrets.PROD_DROPLET_USER }}@${{ secrets.PROD_DROPLET_IP }}:~/node-app/
+          scp -i ~/.ssh/nodejs_do_key package-lock.json ${{ secrets.PROD_DROPLET_USER }}@${{ secrets.PROD_DROPLET_IP }}:~/node-app/
+
+      - name: Set Up .env File
+        run: |
+          ssh -i ~/.ssh/nodejs_do_key ${{ secrets.PROD_DROPLET_USER }}@${{ secrets.PROD_DROPLET_IP }} "echo '${{ secrets.PROD_RUNNER_SECRET_FILE }}' > ~/node-app/.env"
+
+      - name: Install Dependencies and Start App
+        run: |
+          ssh -i ~/.ssh/nodejs_do_key ${{ secrets.PROD_DROPLET_USER }}@${{ secrets.PROD_DROPLET_IP }} << 'EOF'
+          cd ~/node-app
+          npm install --production
+          ls dist  # Debug: Check if dist directory exists on server
+
+          if pm2 list | grep -q node-app; then
+            echo "Restarting existing app..."
+            pm2 restart node-app
+          else
+            echo "Starting new app..."
+            pm2 start dist/server.js --name node-app
+          fi
+          pm2 save
+          EOF

@@ -12,6 +12,7 @@ import path from "path";
 import { ProgressResponse } from "../models/types";
 import { TestRepoManager } from "./testRepoManager";
 import SSELogger from "./sseLogger";
+import { SSEManager } from "./sseManager";
 
 export async function runTestProcess(request: TestRunRequest): Promise<void> {
   const { repoUrl, branch, commitSha } = request;
@@ -108,12 +109,6 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
     SSELogger.log(commitSha, "Starting test process...");
 
     const testResult = await runInDocker(imageName, languageConfig.runCommand);
-    logger.info("Test execution completed", { commitSha });
-    logger.info("Test output:", {
-      stdout: testResult.stdout,
-      stderr: testResult.stderr,
-      exitCode: testResult.exitCode,
-    });
     if (testResult.stdout) {
       SSELogger.log(commitSha, `Test output:\n${testResult.stdout}`);
     }
@@ -125,6 +120,7 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
       commitSha,
       `Test result: ${testResult.exitCode === 0 ? "Success" : "Failed"}`,
     );
+    logger.info("Test execution completed", { commitSha });
 
     // Success is now determined by exit code(using this to avoid having to parse stdout/stderr for success/failure)
     const success = testResult.exitCode === 0;
@@ -162,5 +158,6 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
       await cleanupDocker(imageName);
       logger.info("Docker resources cleaned up");
     }
+    SSEManager.getInstance().closeConnection(commitSha);
   }
 }
