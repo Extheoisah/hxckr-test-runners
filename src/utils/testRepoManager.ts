@@ -70,7 +70,8 @@ export class TestRepoManager {
     challengeId: string,
     language: string,
     stage: number,
-  ): Promise<string> {
+  ): Promise<string | null> {
+    // changed return type to allow null in case of no test file(need to review this flow)
     const repoDir = await this.ensureRepoUpdated();
     const testPath = path.join(
       repoDir,
@@ -85,14 +86,13 @@ export class TestRepoManager {
       logger.info("Test content retrieved successfully");
       return content;
     } catch (error) {
-      logger.error("Error reading test file", {
+      logger.info("No test file found, will run code directly", {
         testPath,
-        error,
         challengeId,
         language,
         stage,
       });
-      throw new Error(`Test file not found: ${testPath}`);
+      return null; // Return null instead of throwing error
     }
   }
 
