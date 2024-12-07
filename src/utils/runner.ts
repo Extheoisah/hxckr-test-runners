@@ -13,6 +13,7 @@ import { ProgressResponse } from "../models/types";
 import { TestRepoManager } from "./testRepoManager";
 import SSELogger from "./sseLogger";
 import { SSEManager } from "./sseManager";
+import { generateRunScript } from "./runScriptGenerator";
 
 export async function runTestProcess(request: TestRunRequest): Promise<void> {
   const { repoUrl, branch, commitSha } = request;
@@ -55,47 +56,31 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
     const languageConfig = getLanguageConfig(language);
     imageName = `test-image-${commitSha}`;
 
-    // Load and write test file
+    // Load test file (might be null)
     const testContent = await loadTestFile(
       challengeId,
       language,
       progress.progress_details.current_step,
     );
 
-    if (language === "rust") {
-      const testsDir = path.join(repoDir, "tests");
-      await fs.mkdir(testsDir, { recursive: true });
+    // Write test file if it exists
+    if (testContent) {
       const testFileName = `stage${progress.progress_details.current_step}${TestRepoManager.getTestExtension(language)}`;
-      await fs.writeFile(path.join(testsDir, testFileName), testContent);
-    } else {
-      const appDir = path.join(repoDir, "app");
-      await fs.mkdir(appDir, { recursive: true });
-      const testFileName = `stage${progress.progress_details.current_step}${TestRepoManager.getTestExtension(language)}`;
-      await fs.writeFile(path.join(appDir, testFileName), testContent);
+      const testFilePath =
+        language === "rust"
+          ? path.join(repoDir, "tests", testFileName)
+          : path.join(repoDir, "app", testFileName);
+      await fs.mkdir(path.dirname(testFilePath), { recursive: true });
+      await fs.writeFile(testFilePath, testContent);
     }
 
-    // Create run.sh with modified commands
-    const runScript = `#!/bin/bash
-    set -e  # Exit on any error
-
-    if [ -f "requirements.txt" ]; then
-        # For Python projects
-        pytest ./app/stage${progress.progress_details.current_step}${TestRepoManager.getTestExtension(language)} -v
-    elif [ -f "Cargo.toml" ]; then
-        # For Rust projects
-        # Build first (quietly)
-        cargo build > /dev/null 2>&1
-        # Run tests and show only test output
-        cargo test --test stage${progress.progress_details.current_step}_test
-    else
-        # For TypeScript projects
-        bun test ./app/stage${progress.progress_details.current_step}${TestRepoManager.getTestExtension(language)}
-    fi
-    `;
-
-    const runScriptPath = path.join(repoDir, ".hxckr", "run.sh");
-    await fs.writeFile(runScriptPath, runScript);
-    await fs.chmod(runScriptPath, 0o755); // Make executable
+    // Generate run script
+    await generateRunScript(
+      repoDir,
+      language,
+      progress.progress_details.current_step,
+      testContent,
+    );
 
     // Build Docker image
     await buildDockerImage(repoDir, imageName, languageConfig.dockerfilePath);
@@ -112,7 +97,9 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
     if (testResult.stdout) {
       SSELogger.log(commitSha, `Test output:\n${testResult.stdout}`);
     }
-    if (testResult.stderr) {
+
+    // Only log stderr if it contains actual errors
+    if (testResult.stderr && testResult.exitCode !== 0) {
       SSELogger.log(commitSha, `Test errors:\n${testResult.stderr}`);
     }
 

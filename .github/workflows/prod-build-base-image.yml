@@ -1,0 +1,49 @@
+name: Build Base Images
+
+on:
+  workflow_dispatch: # Manual trigger
+  push:
+    paths:
+      - "baseImages/**"
+    branches:
+      - main
+
+jobs:
+  build-base-images:
+    name: Build Base Images on Droplet
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image:
+          - { name: "rust", tag: "rs-base", path: "baseImages/rust" }
+          - {
+              name: "typescript",
+              tag: "ts-base",
+              path: "baseImages/typescript",
+            }
+          - { name: "python", tag: "py-base", path: "baseImages/python" }
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.PROD_DROPLET_IP }} >> ~/.ssh/known_hosts
+
+      # Create directory and copy Dockerfile
+      - name: Copy Dockerfile to Droplet
+        run: |
+          ssh ${{ secrets.PROD_DROPLET_USER }}@${{ secrets.PROD_DROPLET_IP }} "mkdir -p ~/base-images/${{ matrix.image.name }}"
+          scp ${{ matrix.image.path }}/Dockerfile ${{ secrets.PROD_DROPLET_USER }}@${{ secrets.PROD_DROPLET_IP }}:~/base-images/${{ matrix.image.name }}/Dockerfile
+
+      # Build the image on the droplet
+      - name: Build Base Image
+        run: |
+          ssh ${{ secrets.PROD_DROPLET_USER }}@${{ secrets.PROD_DROPLET_IP }} << 'EOF'
+            cd ~/base-images/${{ matrix.image.name }}
+            docker build -t ${{ matrix.image.tag }}:latest .
+          EOF
