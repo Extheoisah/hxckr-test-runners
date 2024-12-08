@@ -4,9 +4,11 @@ import logger from "./logger";
 export class SSEManager {
   private static instance: SSEManager;
   private connections: Map<string, Response>;
+  private connectionReadyCallbacks: Map<string, () => void>;
 
   private constructor() {
     this.connections = new Map();
+    this.connectionReadyCallbacks = new Map();
   }
 
   public static getInstance(): SSEManager {
@@ -17,26 +19,51 @@ export class SSEManager {
   }
 
   public addConnection(commitSha: string, res: Response): void {
-    // Check if connection already exists
     if (this.connections.has(commitSha)) {
       logger.warn(`Connection already exists for commit: ${commitSha}`);
       return;
     }
 
-    // Set headers only once
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
 
-    // Store the connection
     this.connections.set(commitSha, res);
 
-    // Send initial message
-    this.sendMessage(commitSha, "Connected to test runner...");
+    // Resolve the ready promise if any waiting
+    const readyCallback = this.connectionReadyCallbacks.get(commitSha);
+    if (readyCallback) {
+      readyCallback();
+      this.connectionReadyCallbacks.delete(commitSha);
+    }
 
     res.on("close", () => {
       this.removeConnection(commitSha);
       logger.info(`SSE connection closed for commit: ${commitSha}`);
+    });
+
+    // Send initial message
+    this.sendMessage(commitSha, "Connected to test runner...");
+  }
+
+  public async ensureConnection(
+    commitSha: string,
+    timeout = 5000,
+  ): Promise<boolean> {
+    if (this.connections.has(commitSha)) {
+      return true;
+    }
+
+    return new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        this.connectionReadyCallbacks.delete(commitSha);
+        resolve(false);
+      }, timeout);
+
+      this.connectionReadyCallbacks.set(commitSha, () => {
+        clearTimeout(timeoutId);
+        resolve(true);
+      });
     });
   }
 
@@ -57,10 +84,11 @@ export class SSEManager {
 
   public removeConnection(commitSha: string): void {
     this.connections.delete(commitSha);
+    this.connectionReadyCallbacks.delete(commitSha);
     logger.debug(`Removed connection for ${commitSha}`);
   }
 
-  public closeConnection(commitSha: string): void {
+  public async closeConnection(commitSha: string): Promise<void> {
     const connection = this.connections.get(commitSha);
     if (connection) {
       try {

@@ -7,7 +7,7 @@ export async function reportResults(
   result: TestResult,
 ): Promise<void> {
   try {
-    logger.info("Reporting test results:", { result });
+    logger.info("Reporting test results:", { commitSha });
 
     const channel = getChannel();
     const message = JSON.stringify({ result });
