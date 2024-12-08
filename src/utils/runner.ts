@@ -34,16 +34,50 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
     if (!challengeId) {
       throw new Error("Challenge ID not found in progress data.");
     }
-    // Check if the status is "not_started"
-    if (progress.status === "not_started") {
+
+    // Check if the challenge is completed
+    if (progress.status === "completed") {
+      logger.info("Challenge already completed", { commitSha });
+
+      // Ensure connection is ready
+      const isConnected =
+        await SSEManager.getInstance().ensureConnection(commitSha);
+      if (!isConnected) {
+        logger.warn("SSE connection not established in time", { commitSha });
+      }
+      SSELogger.log(commitSha, "Challenge completed.");
+
       const testResult: TestResult = {
         event_type: EVENT_TYPE,
         repoUrl,
         commitSha,
         success: true,
-        output: "Challenge setup completed successfully.",
+        output: "Challenge completed. No further testing needed.",
       };
       await reportResults(commitSha, testResult);
+
+      await SSEManager.getInstance().closeConnection(commitSha);
+      return;
+    }
+
+    // Check if the status is "not_started"
+    if (progress.status === "not_started") {
+      logger.info("First run detected, confirming repository setup", {
+        commitSha,
+      });
+      // Just verify we can clone the repository
+      repoDir = await cloneRepository(repoUrl, branch, commitSha);
+      // Report success without running any tests
+      const testResult: TestResult = {
+        event_type: EVENT_TYPE,
+        repoUrl,
+        commitSha,
+        success: true,
+        output: "Challenge setup completed successfully",
+      };
+      await reportResults(commitSha, testResult);
+      SSELogger.log(commitSha, "Challenge setup completed successfully.");
+      SSEManager.getInstance().closeConnection(commitSha);
       return;
     }
 
