@@ -73,8 +73,7 @@ export async function runTestProcess(request: TestRunRequest): Promise<void> {
         repoUrl,
         commitSha,
         success: true,
-        output:
-          "Challenge setup completed successfully. Repository is ready for development.",
+        output: "Challenge setup completed successfully",
       };
       await reportResults(commitSha, testResult);
       SSELogger.log(commitSha, "Challenge setup completed successfully.");
