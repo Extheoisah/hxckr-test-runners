@@ -27,7 +27,7 @@ function generateCommandForLanguage(
     case "python":
       return `pytest ./app/stage${currentStep}_test.py -v`;
     case "rust":
-      return `cargo build
+      return `cargo build --quiet &&
               cargo test ${
                 testContent
                   ? `--test stage${currentStep}_test`
