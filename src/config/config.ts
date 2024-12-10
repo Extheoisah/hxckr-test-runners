@@ -64,6 +64,7 @@ export function getLanguageConfig(language: string): LanguageConfig {
 
 export const config = {
   port: process.env.PORT || 3001,
+  host: process.env.HOST || "0.0.0.0",
   baseUrl: process.env.BASE_URL || "http://192.168.49.2:30025/api",
 };
 
