@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import { runTestProcess } from "./utils/runner";
 import { TestRunRequest } from "./models/types";
 import {
@@ -14,10 +14,16 @@ import { establishSSEConnection } from "./controllers/sseController";
 const app = express();
 app.use(express.json());
 
-const PORT = config.port;
+const PORT = config.port as number;
+const HOST = config.host;
 
 // SSE endpoint
 app.get("/logs/:commitSha", establishSSEConnection);
+
+//health check
+app.get("/health", (_req: Request, res: Response) => {
+  res.send("OK");
+});
 
 async function startConsumer() {
   const channel = getChannel();
@@ -46,8 +52,8 @@ async function startServer() {
     await setupRabbitMQ();
     await startConsumer();
 
-    app.listen(PORT, () => {
-      logger.info(`Test runner service listening on port ${PORT}`);
+    app.listen(PORT, HOST, () => {
+      logger.info(`Test runner service listening at http://${HOST}:${PORT}`);
     });
   } catch (error) {
     logger.error("Failed to start server", { error });
